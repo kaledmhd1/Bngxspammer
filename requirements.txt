@@ -1,0 +1,5 @@
+flask
+requests
+httpx
+pycryptodome
+gunicorn
