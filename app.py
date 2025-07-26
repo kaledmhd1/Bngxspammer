@@ -13,9 +13,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # توكنات UID : Password
 SPAM_TOKENS = {
-    "4064887738": "11ED400B94AC97D3CA736299F1C89D09FDF843FE7ACE372DB85E2F35EC2F7DCC",
-    "4064903378": "372397C2910AB98D5C60FCE54B767945CC89D874CD94F56816F34ED9C5FC75E1",
-    "4064912372": "BD879CE620A1630335B482F2D757DD20E831706EFAC06C242E9ED15419CFA4A5",
+    "3703466495": "799FAF292960B85062BCD462FD8116871F99B4A0505C09FFC6985AA1C32F31EA",
+    "3570958179": "C15AB416AB9FFF0D33F1C7950C75D950135A4DA42692D9433FF736BD5385F7B3",
+    "3571002164": "3D253727E7D7D4EC5CCC188398EABB9A94539579D7F7A041FDE5B268362AFF67",
 }
 
 app = Flask(__name__)
@@ -82,7 +82,7 @@ def get_jwt(uid, password):
 
 async def async_add_fr(player_id, token):
     try:
-        proxy_url = f"{SELF_URL}/proxy_vercel?token={token}&uid={player_id}"
+        proxy_url = f"https://panel-friend-bot.vercel.app/request?token={token}&uid={uid}"
         async with httpx.AsyncClient(timeout=60, verify=False) as client:
             response = await client.get(proxy_url)
             return f"{player_id} -> HTTP {response.status_code}: {response.text[:100]}"
