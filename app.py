@@ -1,99 +1,159 @@
-from flask import Flask, request, Response, jsonify
+from flask import Flask, request, Response
 import requests
 import asyncio
 import httpx
-import threading
-import time
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+import urllib3
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
-import urllib3
+import threading
 import os
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# توكنات UID : Password
+# هنا تحط التوكنات (uid: password)
 SPAM_TOKENS = {
-    "3703466495": "799FAF292960B85062BCD462FD8116871F99B4A0505C09FFC6985AA1C32F31EA",
-    "3570958179": "C15AB416AB9FFF0D33F1C7950C75D950135A4DA42692D9433FF736BD5385F7B3",
-    "3571002164": "3D253727E7D7D4EC5CCC188398EABB9A94539579D7F7A041FDE5B268362AFF67",
+
+    "4064887738": "11ED400B94AC97D3CA736299F1C89D09FDF843FE7ACE372DB85E2F35EC2F7DCC",
+    "4064903378": "372397C2910AB98D5C60FCE54B767945CC89D874CD94F56816F34ED9C5FC75E1",
+    "4064912372": "BD879CE620A1630335B482F2D757DD20E831706EFAC06C242E9ED15419CFA4A5",
+    "4064986315": "DF07BD8D249EC8C80D4D3235FC1ED00EEE46A9E03C80192A187EB8FA40D7A2F1",
+    "4064994323": "231170C6A0ED62D9BA944D89CBC4D6A55CB3F2418E5DCEDE7033FA9C799066D9",
+    "4065003464": "2D1C991FEBA993FA72D0CC72221DF7E6E62325666E3374D47860B141FC365872",
+    "4065012898": "59B63789275C7714D2DC020585F8DAB05DCEBC67515646C04ECA0F4B1E0F1450",
+    "4026743904": "ADA04243B15C2F0D789E63B919749CEB4ECCEEBF982CC4371B9FBEC5231FE556",
+    "4065074223": "72091CDD3ACE17349E0AB0C10B39062691B3212BAFFA957CBE1BB1390CADD63D",
+    "4065081566": "67F566A5B0EFB517459233BEDCDE4BB4FEAE306E28303EBE698F8C6AFE832DA3"
 }
 
 app = Flask(__name__)
 
-PORT = int(os.environ.get('PORT', 8398))
-SELF_URL = os.environ.get("SELF_URL", f"http://127.0.0.1:{PORT}")
+retry_strategy = Retry(
+    total=5,
+    backoff_factor=1,
+    status_forcelist=[500, 502, 503, 504],
+    allowed_methods=["GET"],
+)
 
-# Cache للتوكنات
-JWT_CACHE = {
-    "4064887738": "eyJhbGciOiJIUzI1NiIsInN2ciI6IjEiLCJ0eXAiOiJKV1QifQ.eyJhY2NvdW50X2lkIjoxMjc3NDA3MzMzMywibmlja25hbWUiOiJCTkdYLTEiLCJub3RpX3JlZ2lvbiI6Ik1FIiwibG9ja19yZWdpb24iOiJNRSIsImV4dGVybmFsX2lkIjoiMzQ4ODgwN2UyY2FkYTcxNjgwMGVmYmNmNjgzY2M2NDMiLCJleHRlcm5hbF90eXBlIjo0LCJwbGF0X2lkIjowLCJjbGllbnRfdmVyc2lvbiI6IiIsImVtdWxhdG9yX3Njb3JlIjoxMDAsImlzX2VtdWxhdG9yIjp0cnVlLCJjb3VudHJ5X2NvZGUiOiJVUyIsImV4dGVybmFsX3VpZCI6NDA2NDg4NzczOCwicmVnX2F2YXRhciI6MTAyMDAwMDA3LCJzb3VyY2UiOjAsImxvY2tfcmVnaW9uX3RpbWUiOjE3NTM0NTE5MTcsImNsaWVudF90eXBlIjoxLCJzaWduYXR1cmVfbWQ1IjoiIiwidXNpbmdfdmVyc2lvbiI6MCwicmVsZWFzZV9jaGFubmVsIjoiIiwicmVsZWFzZV92ZXJzaW9uIjoiT0I0OSIsImV4cCI6MTc1MzUzMzAzN30.n_njs83EHXRail_DOL3Y027wMjOF7KRdcEC3_jJgTmI"
-}
+session = requests.Session()
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session.mount("https://", adapter)
+session.mount("http://", adapter)
+
+def Encrypt_ID(x):
+    x = int(x)
+    dec = ['80', '81', '82', '83', '84', '85', '86', '87', '88', '89', '8a', '8b', '8c', '8d', '8e', '8f', '90', '91', '92', '93', '94', '95', '96', '97', '98', '99', '9a', '9b', '9c', '9d', '9e', '9f', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'aa', 'ab', 'ac', 'ad', 'ae', 'af', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'ba', 'bb', 'bc', 'bd', 'be', 'bf', 'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'ca', 'cb', 'cc', 'cd', 'ce', 'cf', 'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'da', 'db', 'dc', 'dd', 'de', 'df', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'ea', 'eb', 'ec', 'ed', 'ee', 'ef', 'f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'fa', 'fb', 'fc', 'fd', 'fe', 'ff']
+    xxx = ['1', '01', '02', '03', '04', '05', '06', '07', '08', '09', '0a', '0b', '0c', '0d', '0e', '0f', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '1a', '1b', '1c', '1d', '1e', '1f', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '2a', '2b', '2c', '2d', '2e', '2f', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '3a', '3b', '3c', '3d', '3e', '3f', '40', '41', '42', '43', '44', '45', '46', '47', '48', '49', '4a', '4b', '4c', '4d', '4e', '4f', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '5a', '5b', '5c', '5d', '5e', '5f', '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '6a', '6b', '6c', '6d', '6e', '6f', '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '7a', '7b', '7c', '7d', '7e', '7f']
+    x = x / 128
+    if x > 128:
+        x = x / 128
+        if x > 128:
+            x = x / 128
+            if x > 128:
+                x = x / 128
+                strx = int(x)
+                y = (x - int(strx)) * 128
+                stry = str(int(y))
+                z = (y - int(stry)) * 128
+                strz = str(int(z))
+                n = (z - int(strz)) * 128
+                strn = str(int(n))
+                m = (n - int(strn)) * 128
+                return dec[int(m)] + dec[int(n)] + dec[int(z)] + dec[int(y)] + xxx[int(x)]
+            else:
+                strx = int(x)
+                y = (x - int(strx)) * 128
+                stry = str(int(y))
+                z = (y - int(stry)) * 128
+                strz = str(int(z))
+                n = (z - int(strz)) * 128
+                strn = str(int(n))
+                return dec[int(n)] + dec[int(z)] + dec[int(y)] + xxx[int(x)]
+
+def encrypt_api(plain_text):
+    plain_text = bytes.fromhex(plain_text)
+    key = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
+    iv = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 106, 77, 37])
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    cipher_text = cipher.encrypt(pad(plain_text, AES.block_size))
+    return cipher_text.hex()
 
 def get_jwt(uid, password):
-    url = f"https://jwt-gen-api-v2.onrender.com/token?uid={uid}&password={password}"
+    api_url = f"https://jwt-gen-api-v2.onrender.com/token?uid={uid}&password={password}"
     try:
-        response = requests.get(url, timeout=30)
-        print(f"[GET_JWT] Response status: {response.status_code}")
-        print(f"[GET_JWT] Response content: {response.text}")
+        response = session.get(api_url, verify=False, timeout=30)
+        print(f"[DEBUG] UID {uid} -> {response.status_code}: {response.text}")
         if response.status_code == 200:
             data = response.json()
+            # نقبل أي status ما دام فيه token
             if "token" in data:
                 return data["token"]
-        return None
-    except Exception as e:
-        print(f"[JWT-EXCEPTION] {uid}: {e}")
-        return None
-
-async def async_add_fr(player_id, token):
-    try:
-        # استخدم player_id للـ uid في الطلب، token خاص بالحساب المرسل
-        proxy_url = f"https://panel-friend-bot.vercel.app/request?token={token}&uid={player_id}"
-        async with httpx.AsyncClient(timeout=60, verify=False) as client:
-            response = await client.get(proxy_url)
-            return f"HTTP {response.status_code}: {response.text[:100]}"
-    except Exception as e:
-        return f"Error: {e}"
-
-def refresh_tokens_background():
-    while True:
-        print("[DEBUG] Refreshing all JWT tokens...")
-        for uid, pw in SPAM_TOKENS.items():
-            token = get_jwt(uid, pw)
-            if token:
-                JWT_CACHE[uid] = token
-                print(f"[JWT] {uid} -> Token updated successfully")
             else:
-                print(f"[JWT] {uid} -> Failed to get token")
-        print(f"[DEBUG] Current JWT_CACHE keys: {list(JWT_CACHE.keys())}")
-        time.sleep(3600)
+                print(f"Failed to get JWT for {uid}: {data}")
+                return None
+        else:
+            print(f"API request failed with status code: {response.status_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred for {uid}: {e}")
+        return None
 
-@app.route("/healthz")
-def healthz():
-    return jsonify({"status": "ok"}), 200
+async def async_add_fr(id, token):
+    url = f'https://panel-friend-bot.vercel.app/request?token={token}&uid={id}'
+    headers = {
+        'X-Unity-Version': '2018.4.11f1',
+        'ReleaseVersion': 'OB49',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-GA': 'v1 1',
+        'Authorization': f'Bearer {token}',
+        'Content-Length': '16',
+        'User-Agent': 'Dalvik/2.1.0 (Linux; U; Android 7.1.2; ASUS_Z01QD Build/QKQ1.190825.002)',
+        'Host': 'clientbp.ggblueshark.com',
+        'Connection': 'Keep-Alive',
+        'Accept-Encoding': 'gzip'
+    }
+    data = bytes.fromhex(encrypt_api(f'08a7c4839f1e10{Encrypt_ID(id)}1801'))
+    
+    async with httpx.AsyncClient(verify=False, timeout=60) as client:
+        response = await client.post(url, headers=headers, data=data)
+        if response.status_code == 400 and 'BR_FRIEND_NOT_SAME_REGION' in response.text:
+            return f'Id : {id} Not In Same Region !'
+        elif response.status_code == 200:
+            return f'Good Response Done Send To Id : {id}!'
+        elif 'BR_FRIEND_MAX_REQUEST' in response.text:
+            return f'Id : {id} Reached Max Requests !'
+        elif 'BR_FRIEND_ALREADY_SENT_REQUEST' in response.text:
+            return f'Token Already Sent Requests To Id : {id}!'
+        else:
+            return response.text
 
-def generate(player_id):
-    yield f"📨 Sending friend requests to player {player_id}...\n\n"
+def send_requests_in_background(id):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    tasks = [async_add_fr(id, get_jwt(uid, pw)) for uid, pw in SPAM_TOKENS.items()]
+    responses = loop.run_until_complete(asyncio.gather(*tasks))
+    print("All requests sent:", responses)
+
+def generate(id):
+    yield f"📨 Sending friend requests to player {id}...\n\n"
     for uid, pw in SPAM_TOKENS.items():
-        token = JWT_CACHE.get(uid)
+        token = get_jwt(uid, pw)
         if not token:
-            yield f"❌ No JWT for {uid}\n"
+            yield f"❌ Failed to get JWT for {uid}\n"
             continue
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(async_add_fr(player_id, token))
+        result = asyncio.run(async_add_fr(id, token))
         yield f"{uid} ➤ {result}\n"
 
-@app.route("/spam")
-def spam():
-    player_id = request.args.get("id")
-    if not player_id:
-        return "Please provide ?id=UID"
-    return Response(generate(player_id), content_type="text/plain")
+@app.route('/spam')
+def index():
+    id = request.args.get('id')
+    if id:
+        return Response(generate(id), content_type='text/plain')
+    else:
+        return "Please provide a valid ID."
 
-@app.route("/tokens")
-def show_tokens():
-    # عرض محتويات الـ JWT_CACHE للتحقق من التوكنات المحفوظة
-    return jsonify({uid: (token[:20] + "...") for uid, token in JWT_CACHE.items()})
 
-if __name__ == "__main__":
-    threading.Thread(target=refresh_tokens_background, daemon=True).start()
-    app.run(host="0.0.0.0", port=PORT)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8398))
+    app.run(host='0.0.0.0', port=port, debug=True)
