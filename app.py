@@ -30,11 +30,12 @@ def get_jwt(uid, password):
     url = f"https://jwt-gen-api-v2.onrender.com/token?uid={uid}&password={password}"
     try:
         response = requests.get(url, timeout=30)
+        print(f"[GET_JWT] Response status: {response.status_code}")
+        print(f"[GET_JWT] Response content: {response.text}")
         if response.status_code == 200:
             data = response.json()
             if "token" in data:
                 return data["token"]
-        print(f"[JWT-ERROR] {uid}: {response.text}")
         return None
     except Exception as e:
         print(f"[JWT-EXCEPTION] {uid}: {e}")
