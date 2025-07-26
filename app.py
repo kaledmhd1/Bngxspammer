@@ -24,7 +24,9 @@ PORT = int(os.environ.get('PORT', 8398))
 SELF_URL = os.environ.get("SELF_URL", f"http://127.0.0.1:{PORT}")
 
 # Cache للتوكنات
-JWT_CACHE = {}
+JWT_CACHE = {
+    "3703466495": "eyJhbGciOiJIUzI1NiIsInN2ciI6IjEiLCJ0eXAiOiJKV1QifQ.eyJhY2NvdW50X2lkIjoxMjc3NDA3MzMzMywibmlja25hbWUiOiJCTkdYLTEiLCJub3RpX3JlZ2lvbiI6Ik1FIiwibG9ja19yZWdpb24iOiJNRSIsImV4dGVybGFsX2lkIjoiMzQ4ODgwN2UyY2FkYTcxNjgwMGVmYmNmNjgzY2M2NDMiLCJleHRlcm5hbF90eXBlIjo0LCJwbGF0X2lkIjowLCJjbGllbnRfdmVyc2lvbiI6IiIsImVtdWxhdG9yX3Njb3JlIjoxMDAsImlzX2VtdWxhdG9yIjp0cnVlLCJjb3VudHJ5X2NvZGUiOiJVUyIsImV4dGVybmFsX3VpZCI6NDA2NDg4NzczOCwicmVnX2F2YXRhciI6MTAyMDAwMDA3LCJzb3VyY2UiOjAsImxvY2tfcmVnaW9uX3RpbWUiOjE3NTM0NTE5MTcsImNsaWVudF90eXBlIjoxLCJzaWduYXR1cmVfbWQ1IjoiIiwidXNpbmdfdmVyc2lvbiI6MCwicmVsZWFzZV9jaGFubmVsIjoiIiwicmVsZWFzZV92ZXJzaW9uIjoiT0I0OSIsImV4cCI6MTc1MzUzMzAzN30.n_njs83EHXRail_DOL3Y027wMjOF7KRdcEC3_jJgTmI"
+}
 
 def get_jwt(uid, password):
     url = f"https://jwt-gen-api-v2.onrender.com/token?uid={uid}&password={password}"
