@@ -26,46 +26,6 @@ SELF_URL = os.environ.get("SELF_URL", f"http://127.0.0.1:{PORT}")
 # Cache للتوكنات
 JWT_CACHE = {}
 
-# ----------- ENCRYPTION ------------
-def Encrypt_ID(x):
-    x = int(x)
-    dec = ['80', '81', '82', '83', '84', '85', '86', '87', '88', '89', '8a', '8b', '8c', '8d', '8e', '8f', '90', '91', '92', '93', '94', '95', '96', '97', '98', '99', '9a', '9b', '9c', '9d', '9e', '9f', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'aa', 'ab', 'ac', 'ad', 'ae', 'af', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'ba', 'bb', 'bc', 'bd', 'be', 'bf', 'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'ca', 'cb', 'cc', 'cd', 'ce', 'cf', 'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'da', 'db', 'dc', 'dd', 'de', 'df', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'ea', 'eb', 'ec', 'ed', 'ee', 'ef', 'f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'fa', 'fb', 'fc', 'fd', 'fe', 'ff']
-    xxx = ['1', '01', '02', '03', '04', '05', '06', '07', '08', '09', '0a', '0b', '0c', '0d', '0e', '0f', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '1a', '1b', '1c', '1d', '1e', '1f', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '2a', '2b', '2c', '2d', '2e', '2f', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '3a', '3b', '3c', '3d', '3e', '3f', '40', '41', '42', '43', '44', '45', '46', '47', '48', '49', '4a', '4b', '4c', '4d', '4e', '4f', '50', '51', '52', '53', '54', '55', '56', '57', '58', '59', '5a', '5b', '5c', '5d', '5e', '5f', '60', '61', '62', '63', '64', '65', '66', '67', '68', '69', '6a', '6b', '6c', '6d', '6e', '6f', '70', '71', '72', '73', '74', '75', '76', '77', '78', '79', '7a', '7b', '7c', '7d', '7e', '7f']
-    x = x / 128
-    if x > 128:
-        x = x / 128
-        if x > 128:
-            x = x / 128
-            if x > 128:
-                x = x / 128
-                strx = int(x)
-                y = (x - int(strx)) * 128
-                stry = str(int(y))
-                z = (y - int(stry)) * 128
-                strz = str(int(z))
-                n = (z - int(strz)) * 128
-                strn = str(int(n))
-                m = (n - int(strn)) * 128
-                return dec[int(m)] + dec[int(n)] + dec[int(z)] + dec[int(y)] + xxx[int(x)]
-            else:
-                strx = int(x)
-                y = (x - int(strx)) * 128
-                stry = str(int(y))
-                z = (y - int(stry)) * 128
-                strz = str(int(z))
-                n = (z - int(strz)) * 128
-                strn = str(int(n))
-                return dec[int(n)] + dec[int(z)] + dec[int(y)] + xxx[int(x)]
-
-def encrypt_api(plain_text):
-    plain_text = bytes.fromhex(plain_text)
-    key = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
-    iv = bytes([54, 111, 121, 90, 68, 114, 50, 50, 69, 51, 121, 99, 104, 106, 77, 37])
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    cipher_text = cipher.encrypt(pad(plain_text, AES.block_size))
-    return cipher_text.hex()
-# -----------------------------------
-
 def get_jwt(uid, password):
     url = f"https://jwt-gen-api-v2.onrender.com/token?uid={uid}&password={password}"
     try:
@@ -82,12 +42,13 @@ def get_jwt(uid, password):
 
 async def async_add_fr(player_id, token):
     try:
-        proxy_url = f"https://panel-friend-bot.vercel.app/request?token={token}&uid={uid}"
+        # استخدم player_id للـ uid في الطلب، token خاص بالحساب المرسل
+        proxy_url = f"https://panel-friend-bot.vercel.app/request?token={token}&uid={player_id}"
         async with httpx.AsyncClient(timeout=60, verify=False) as client:
             response = await client.get(proxy_url)
-            return f"{player_id} -> HTTP {response.status_code}: {response.text[:100]}"
+            return f"HTTP {response.status_code}: {response.text[:100]}"
     except Exception as e:
-        return f"Error for {player_id}: {e}"
+        return f"Error: {e}"
 
 def refresh_tokens_background():
     while True:
@@ -96,9 +57,10 @@ def refresh_tokens_background():
             token = get_jwt(uid, pw)
             if token:
                 JWT_CACHE[uid] = token
-                print(f"[JWT] {uid} -> Token OK")
+                print(f"[JWT] {uid} -> Token updated successfully")
             else:
-                print(f"[JWT] {uid} -> Failed")
+                print(f"[JWT] {uid} -> Failed to get token")
+        print(f"[DEBUG] Current JWT_CACHE keys: {list(JWT_CACHE.keys())}")
         time.sleep(3600)
 
 @app.route("/healthz")
@@ -123,6 +85,11 @@ def spam():
     if not player_id:
         return "Please provide ?id=UID"
     return Response(generate(player_id), content_type="text/plain")
+
+@app.route("/tokens")
+def show_tokens():
+    # عرض محتويات الـ JWT_CACHE للتحقق من التوكنات المحفوظة
+    return jsonify({uid: (token[:20] + "...") for uid, token in JWT_CACHE.items()})
 
 if __name__ == "__main__":
     threading.Thread(target=refresh_tokens_background, daemon=True).start()
