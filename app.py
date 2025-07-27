@@ -31,7 +31,6 @@ session.mount("https://", adapter)
 session.mount("http://", adapter)
 
 
-# ================== ENCRYPTION ==================
 def Encrypt_ID(x):
     x = int(x)
     dec = ['80', '81', '82', '83', '84', '85', '86', '87', '88', '89', '8a', '8b', '8c', '8d', '8e', '8f', '90', '91', '92', '93', '94', '95', '96', '97', '98', '99', '9a', '9b', '9c', '9d', '9e', '9f', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'aa', 'ab', 'ac', 'ad', 'ae', 'af', 'b0', 'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'ba', 'bb', 'bc', 'bd', 'be', 'bf', 'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'ca', 'cb', 'cc', 'cd', 'ce', 'cf', 'd0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8', 'd9', 'da', 'db', 'dc', 'dd', 'de', 'df', 'e0', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9', 'ea', 'eb', 'ec', 'ed', 'ee', 'ef', 'f0', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'fa', 'fb', 'fc', 'fd', 'fe', 'ff']
@@ -71,22 +70,35 @@ def encrypt_api(plain_text):
     return cipher_text.hex()
 
 
-# ================== JWT HANDLING ==================
 def load_accounts():
     if not os.path.exists(ACCS_FILE):
+        print(f"[ERROR] {ACCS_FILE} not found!")
         return {}
     with open(ACCS_FILE, "r") as f:
-        return json.loads(f.read().strip() or "{}")
+        content = f.read().strip()
+        try:
+            data = json.loads(content or "{}")
+            print(f"[DEBUG] Loaded {len(data)} accounts")
+            return data
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Failed to parse JSON: {e}")
+            return {}
+
 
 def get_jwt(uid, password):
     api_url = f"https://jwt-gen-api-v2.onrender.com/token?uid={uid}&password={password}"
     try:
         response = session.get(api_url, verify=False, timeout=30)
         if response.status_code == 200:
-            return response.json().get("token")
+            token = response.json().get("token")
+            print(f"[DEBUG] JWT for {uid}: {token}")
+            return token
+        else:
+            print(f"[ERROR] Failed to get JWT for {uid}, status: {response.status_code}")
     except Exception as e:
-        print(f"[ERROR] get_jwt({uid}): {e}")
+        print(f"[ERROR] Exception in get_jwt for {uid}: {e}")
     return None
+
 
 def refresh_tokens():
     accounts = load_accounts()
@@ -105,7 +117,6 @@ def refresh_tokens():
     threading.Timer(3600, refresh_tokens).start()
 
 
-# ================== SPAM FUNCTION ==================
 async def async_add_fr(uid, token, target_id):
     url = f'https://panel-friend-bot.vercel.app/request?token={token}&uid={target_id}'
     data = bytes.fromhex(encrypt_api(f'08a7c4839f1e10{Encrypt_ID(target_id)}1801'))
@@ -124,6 +135,7 @@ async def async_add_fr(uid, token, target_id):
         except Exception as e:
             return f"{uid} ➤ ERROR {e}"
 
+
 def spam_task(target_id):
     with LOCK:
         tokens = TOKENS.copy()
@@ -135,7 +147,6 @@ def spam_task(target_id):
     return loop.run_until_complete(asyncio.gather(*tasks))
 
 
-# ================== FLASK ROUTE ==================
 @app.route("/spam")
 def spam_endpoint():
     target_id = request.args.get("id")
@@ -148,7 +159,6 @@ def spam_endpoint():
     return Response(generate(), content_type="text/plain")
 
 
-# ================== STARTUP ==================
 if __name__ == "__main__":
     print("[INFO] Initial token refresh...")
     refresh_tokens()
