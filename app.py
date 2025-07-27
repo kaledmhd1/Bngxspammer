@@ -73,7 +73,7 @@ def refresh_tokens():
     with LOCK:
         TOKENS = new_tokens
     print(f"[INFO] Tokens refreshed: {len(TOKENS)} active.")
-    threading.Timer(3600, refresh_tokens).start()
+    threading.Timer(900, refresh_tokens).start()
 
 
 async def async_add_fr(uid, token, target_id):
