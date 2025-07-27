@@ -61,6 +61,7 @@ def Encrypt_ID(x):
                 strn = str(int(n))
                 return dec[int(n)] + dec[int(z)] + dec[int(y)] + xxx[int(x)]
 
+
 def encrypt_api(plain_text):
     plain_text = bytes.fromhex(plain_text)
     key = bytes([89, 103, 38, 116, 99, 37, 68, 69, 117, 104, 54, 37, 90, 99, 94, 56])
@@ -159,8 +160,11 @@ def spam_endpoint():
     return Response(generate(), content_type="text/plain")
 
 
+# <<<--- التغيير المهم هنا --->
+print("[INFO] Initial token refresh (app load)...")
+refresh_tokens()
+
+
 if __name__ == "__main__":
-    print("[INFO] Initial token refresh...")
-    refresh_tokens()
     port = int(os.environ.get("PORT", 8398))
     app.run(host="0.0.0.0", port=port, debug=True)
