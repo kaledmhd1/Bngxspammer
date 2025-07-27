@@ -109,13 +109,22 @@ def spam_task(target_id):
 def spam_endpoint():
     target_id = request.args.get("id")
     if not target_id:
-        return "Please provide ?id=UID"
-    def generate():
-        yield f"📨 Sending friend requests to {target_id}...\n"
-        for r in spam_task(target_id):
-            yield r + "\n"
-    return Response(generate(), content_type="text/plain")
+        return "الرجاء إدخال ?id=UID", 400
 
+    results = spam_task(target_id)  # تنفذ كل الطلبات وترجع قائمة النتائج
+
+    success_count = 0
+    fail_count = 0
+
+    for res in results:
+        if "Success" in res:
+            success_count += 1
+        elif "Invalid token" in res or "ERROR" in res:
+            fail_count += 1
+        else:
+            fail_count += 1  # احتياطياً نعد أي شيء غير واضح كفشل
+
+    return f"تم إرسال {success_count} طلب بنجاح، وفشل {fail_count} طلب."
 
 print("[INFO] Initial token refresh (app load)...")
 refresh_tokens()
