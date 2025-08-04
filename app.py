@@ -1,11 +1,9 @@
 from flask import Flask, request
-import asyncio
 import httpx
-import threading
+import asyncio
 
 app = Flask(__name__)
 
-# حسابات (uid: password) مدمجة
 ACCOUNTS = {
     "4050080063": "6BBB96505235F3032AA1BF4BE5493ED01CAB52BF280699FF38EA30915C38C3D5",
     "4050057094": "74C145EDDCB825C120F13CFE547B50D74EF85260CA8A14D97687017A2CFE1BB3",
@@ -49,51 +47,29 @@ ACCOUNTS = {
     "4051627603": "113F8AB7F492737E10DC20A9A9F7A4442AD0648D263C9F78E724E7AC370174F7"
 }
 
-TOKENS = {}
-LOCK = threading.Lock()
-MAX_CONCURRENT = 40  # الحد الأقصى للطلبات المتزامنة
-
-async def fetch_jwt(semaphore, session, uid, password):
+async def fetch_jwt(session, uid, password):
     url = f"https://bngx-jwt-pgwb.onrender.com/api/oauth_guest?uid={uid}&password={password}"
-    async with semaphore:
-        try:
-            resp = await session.get(url, timeout=30)
-            if resp.status_code == 200:
-                data = resp.json()
-                token = data.get("token") or data.get("BearerAuth") or data.get("jwt")
-                return uid, token
-        except:
-            pass
-    return uid, None
+    try:
+        resp = await session.get(url, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        token = data.get("token") or data.get("BearerAuth") or data.get("jwt")
+        return uid, token
+    except Exception:
+        return uid, None
 
-async def refresh_all_tokens():
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
-    async with httpx.AsyncClient() as session:
-        tasks = [fetch_jwt(semaphore, session, uid, pw) for uid, pw in ACCOUNTS.items()]
-        results = await asyncio.gather(*tasks)
-
-    with LOCK:
-        for uid, token in results:
-            if token:
-                TOKENS[uid] = token
-            elif uid in TOKENS:
-                del TOKENS[uid]
-
-async def add_friend(semaphore, session, uid, token, target_uid):
+async def add_friend(session, uid, token, target_uid):
     url = f"https://bngx-add-friend.onrender.com/add_friend?token={token}&uid={target_uid}"
-    async with semaphore:
-        try:
-            resp = await session.get(url, timeout=30)
-            if resp.status_code == 200:
-                text = resp.text
-                if "Invalid token" in text or resp.status_code == 401:
-                    with LOCK:
-                        TOKENS.pop(uid, None)
-                    return f"{uid} ➤ Invalid token (removed)"
-                return f"{uid} ➤ Success"
-            return f"{uid} ➤ Failed: {resp.text}"
-        except Exception as e:
-            return f"{uid} ➤ Error: {str(e)}"
+    try:
+        resp = await session.get(url, timeout=30)
+        text = resp.text
+        if "Invalid token" in text or resp.status_code == 401:
+            return f"{uid} ➤ Invalid token"
+        if resp.status_code == 200:
+            return f"{uid} ➤ Success"
+        return f"{uid} ➤ Failed: {text}"
+    except Exception as e:
+        return f"{uid} ➤ Error: {str(e)}"
 
 @app.route("/spam")
 def spam():
@@ -101,21 +77,22 @@ def spam():
     if not target_uid:
         return "يرجى إدخال ?id=UID", 400
 
-    # نجدد التوكنات أولاً (بحد أقصى 40 متزامن)
-    asyncio.run(refresh_all_tokens())
-
-    async def run_spam():
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+    async def main():
         async with httpx.AsyncClient() as session:
-            tasks = [add_friend(semaphore, session, uid, token, target_uid) for uid, token in TOKENS.items()]
-            return await asyncio.gather(*tasks)
+            results = []
+            for uid, pw in ACCOUNTS.items():
+                uid, token = await fetch_jwt(session, uid, pw)
+                if not token:
+                    results.append(f"{uid} ➤ Failed to get token")
+                    continue
+                result = await add_friend(session, uid, token, target_uid)
+                results.append(result)
 
-    results = asyncio.run(run_spam())
+            success = sum("Success" in r for r in results)
+            fail = len(results) - success
+            return f"تم إرسال {success} طلب بنجاح، وفشل {fail} طلب."
 
-    success = sum("Success" in r for r in results)
-    fail = len(results) - success
-
-    return f"تم إرسال {success} طلب بنجاح، وفشل {fail} طلب."
+    return asyncio.run(main())
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8398, debug=True)
