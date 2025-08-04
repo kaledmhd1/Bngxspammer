@@ -1,96 +1,116 @@
 from flask import Flask, request
 import asyncio
 import httpx
-import json
-import os
-import urllib3
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import threading
 
 app = Flask(__name__)
 
-ACCS_FILE = "accs.txt"  # ملف الحسابات
+# حسابات مدمجة داخل الكود: uid => password
+ACCOUNTS = {
+    "4050080063": "6BBB96505235F3032AA1BF4BE5493ED01CAB52BF280699FF38EA30915C38C3D5",
+    "4050057094": "74C145EDDCB825C120F13CFE547B50D74EF85260CA8A14D97687017A2CFE1BB3",
+    "4050040245": "E89BD9E5CA209E95F654E6FBB4640668B2A16A4E7B1D3AFF0D9F04EABA970234",
+    "4050033008": "747FBBB1E4237C52336D1AC76CFD01510E1BE92A0845105F4C02892A049008D3",
+    "4049998063": "33855BDA5A36F4EEBDCCA5A1E90A614FEE61572435D60FD55A4800BC64A950C5",
+    "4049986344": "1E228A8B0BBE5ADB0664FF74D410B554A10CBE812166C2109E26F7DB887954C5",
+    "4049925045": "921D94B85B962AB38B2258038CB0E314A847B392C73649D39AFC276D0266C112",
+    "4049978850": "D60E7897701BC70F960F7C964C83BC4ADA73D12685FD37A71C4C7C2B4B92BB66",
+    "4049962763": "3A29A38ECA6493437307EB36C4BD8226596535644BC6A19814A7F4993A2FFAE8",
+    "4049943000": "8519BB35142116D7328C7432036A94FF570EBB1ED539355B5029D9BE5FB183F1",
+    "4049933633": "6F8C3340E57CFCEF2414463FB7863DF99679986079FC8224DAB18FECD1444156",
+    "4049916834": "9934832EF93D88FACE10C95ABAC1574A42E2F245F3A3FDB34065A70551811E7B",
+    "4049904817": "E4FE120EAA43ED53D4C9B1D7FC939CBF229E9F65E5F33E48CE06CBD7FC11CAA7",
+    "4049887746": "B76441A613817E36EAF5C02B49260CB0AB3D1FF4336DB25F509846788CCE8022",
+    "4000977837": "3B1B96E2024EA57EAEBC6C312EFAB3649EF544CAA71D6D4D2F9003F9F407E73A",
+    "4051959636": "18D1F56CEA82DACD7B7D2609F7BA615C020077119864F2009A5B6E1B86D0CC02",
+    "4051755909": "9FB369453E38A99B3A992851BC49A4C241B0C2D73C07FED4085CB7153A691E6E",
+    "4051948335": "6D4703D3E2BE6CFE8973FF783A532C4525E34E6BEC26F63FF653AD6FBBA750D4",
+    "4051941566": "552F6C4988F723E9FAADAAA2ADC06AD3B02C55881EDD7428089146D6939DFCA5",
+    "4051910611": "8F632A040DA9582CD5BA7DDC4AA837E52F066DCC2A132FDF579AA1F6904F99C7",
+    "4051903758": "B6086537F60A226F4C361ABF9D84D315168087212DB207B22D17FDE80D818D00",
+    "4051895352": "9744A60BA8398977CBED763FC43DF51E4B744A5A43E22091656A9AD6849CC3F7",
+    "4051888114": "E3EE27382EC8ADEF709C7FDF1D38FBD78F69D1C9D11C2C45B2C063103210F97B",
+    "4051883794": "2E3F2AEE8264F88C38E419070C7FCA464BCBA849089B58049B7F3DC7FBEF694F",
+    "4051835259": "5A461F1D65E5214A7A3AA95AF502AD5DAA85D941A03D8083DDBC26A007EDF699",
+    "4051829815": "B4ABCB8712016DC619A5AC7B6CFE6823AE996256586BD5C4CF9B3437827CD0BF",
+    "4051823625": "F6CF5424ED930B43C7D47E0EAF1A347AF7F78D6EF94E3F8264E663F149E579EA",
+    "4051817693": "4D4DEC619197AA93E0CD93FE6C40C00FAEBAD025B0DEBE96189E00E56FE5D62B",
+    "4051676161": "B56EFA84020DD8748556E0D885BEC754D85ED1F92DFE3E490D59BF7B2C67EEDB",
+    "4051801201": "46B883CF8C9AA42E0E56A1529860642302C15A7911D27584515026482E37BD5E",
+    "4051703176": "ECD8D504BF79619990DA83FE8CC5AAC999FACBD49A9BFD2921FAE4CA1716CF2D",
+    "4051794437": "0927E0755800008553F77FAA4B5B43E0A54DD51D3D771D28A7E1F3A3CC7552F4",
+    "4051783809": "D38A48A8E580C0CC3462F851AA0F6E0A866FEC83F006631DA610F7DA737DE891",
+    "4051761386": "321944F7A2377F7CB181207DCF29A8351F94DF8146201B109F8658D0811F23A2",
+    "4051726294": "8C1DA9370427FE2A94B8729C61D7B3C9D6A841AC2EED1566F62B180BDD26509B",
+    "4051668708": "89D4846E0E341A7A904E41B0B3EB331ED607EC369CFBBEEB78383C2710F5CE1A",
+    "4051664470": "A7781592774A50D1A823E1657028636E7A80EEAE75284BCAB96BFFCD318AFC6D",
+    "4051653143": "613F513B6FE1EF42F4D2F3939C98B10A381172FA2E049476863C08CA22DB1798",
+    "4051633493": "C1DB28F38F6F60E45DB26D7F565A0C1AAB514757EDFD57173986A4C4067F990A",
+    "4051627603": "113F8AB7F492737E10DC20A9A9F7A4442AD0648D263C9F78E724E7AC370174F7"
+}
 
+TOKENS = {}
+LOCK = threading.Lock()
 
 async def fetch_jwt(session, uid, password):
     url = f"https://bngx-jwt-pgwb.onrender.com/api/oauth_guest?uid={uid}&password={password}"
     try:
-        resp = await session.get(url, timeout=30, verify=False)
+        resp = await session.get(url, timeout=30)
         if resp.status_code == 200:
             data = resp.json()
-            # حسب شكل الاستجابة يمكن تعديل المفتاح المستخدم للحصول على التوكن
             token = data.get("token") or data.get("BearerAuth") or data.get("jwt")
             return uid, token
-        else:
-            print(f"[ERROR] Failed to get JWT for {uid}, status: {resp.status_code}")
-            return uid, None
-    except Exception as e:
-        print(f"[ERROR] Exception in fetch_jwt for {uid}: {e}")
+        return uid, None
+    except Exception:
         return uid, None
 
-
-async def fetch_all_tokens(accounts):
-    async with httpx.AsyncClient() as client:
-        tasks = [fetch_jwt(client, uid, pw) for uid, pw in accounts.items()]
+async def refresh_all_tokens():
+    async with httpx.AsyncClient() as session:
+        tasks = [fetch_jwt(session, uid, pw) for uid, pw in ACCOUNTS.items()]
         results = await asyncio.gather(*tasks)
-        tokens = {uid: token for uid, token in results if token}
-        return tokens
+    with LOCK:
+        for uid, token in results:
+            if token:
+                TOKENS[uid] = token
+            elif uid in TOKENS:
+                del TOKENS[uid]
 
-
-async def async_add_fr(uid, token, target_id):
-    url = f'https://bngx-add-friend.onrender.com/add_friend?token={token}&uid={target_id}'
-    async with httpx.AsyncClient(verify=False, timeout=60) as client:
-        try:
-            response = await client.get(url)
-            text = response.text
-            if "Invalid token" in text or response.status_code == 401:
-                print(f"[REMOVED] {uid} (Invalid Token)")
-                return f"{uid} ➤ Invalid token (REMOVED)"
-            elif response.status_code == 200:
-                return f"{uid} ➤ Success for {target_id}"
-            return f"{uid} ➤ {text}"
-        except Exception as e:
-            return f"{uid} ➤ ERROR {e}"
-
-
-async def spam_task_async(target_id, tokens):
-    tasks = [async_add_fr(uid, token, target_id) for uid, token in tokens.items()]
-    results = await asyncio.gather(*tasks)
-    return results
-
+async def add_friend(session, uid, token, target_uid):
+    url = f"https://bngx-add-friend.onrender.com/add_friend?token={token}&uid={target_uid}"
+    try:
+        resp = await session.get(url, timeout=30)
+        if resp.status_code == 200:
+            text = resp.text
+            if "Invalid token" in text or resp.status_code == 401:
+                with LOCK:
+                    TOKENS.pop(uid, None)
+                return f"{uid} ➤ Invalid token (removed)"
+            return f"{uid} ➤ Success"
+        return f"{uid} ➤ Failed: {resp.text}"
+    except Exception as e:
+        return f"{uid} ➤ Error: {str(e)}"
 
 @app.route("/spam")
-def spam_endpoint():
-    target_id = request.args.get("id")
-    if not target_id:
-        return "الرجاء إدخال ?id=UID", 400
+def spam():
+    target_uid = request.args.get("id")
+    if not target_uid:
+        return "يرجى إدخال ?id=UID", 400
 
-    if not os.path.exists(ACCS_FILE):
-        return "ملف الحسابات غير موجود", 500
+    # نجدد التوكنات أولاً بشكل متزامن
+    asyncio.run(refresh_all_tokens())
 
-    with open(ACCS_FILE, "r") as f:
-        try:
-            accounts = json.load(f)
-        except Exception as e:
-            return f"خطأ في قراءة ملف الحسابات: {str(e)}", 500
+    async def run_spam():
+        async with httpx.AsyncClient() as session:
+            tasks = [add_friend(session, uid, token, target_uid) for uid, token in TOKENS.items()]
+            return await asyncio.gather(*tasks)
 
-    if not accounts:
-        return "لا توجد حسابات متاحة", 500
+    results = asyncio.run(run_spam())
 
-    # جلب التوكنات وتنفيذ الطلبات كلها في نفس الطلب
-    tokens = asyncio.run(fetch_all_tokens(accounts))
-    if not tokens:
-        return "فشل في جلب التوكنات الصالحة", 500
+    success = sum("Success" in r for r in results)
+    fail = len(results) - success
 
-    results = asyncio.run(spam_task_async(target_id, tokens))
-
-    success_count = sum(1 for res in results if "Success" in res)
-    fail_count = len(results) - success_count
-
-    return f"تم إرسال {success_count} طلب بنجاح، وفشل {fail_count} طلب."
-
+    return f"تم إرسال {success} طلب بنجاح، وفشل {fail} طلب."
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8398))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=8398, debug=True)
 
