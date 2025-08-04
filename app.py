@@ -5,7 +5,7 @@ import threading
 
 app = Flask(__name__)
 
-# حسابات مدمجة داخل الكود: uid => password
+# حسابات (uid: password) مدمجة
 ACCOUNTS = {
     "4050080063": "6BBB96505235F3032AA1BF4BE5493ED01CAB52BF280699FF38EA30915C38C3D5",
     "4050057094": "74C145EDDCB825C120F13CFE547B50D74EF85260CA8A14D97687017A2CFE1BB3",
@@ -51,23 +51,27 @@ ACCOUNTS = {
 
 TOKENS = {}
 LOCK = threading.Lock()
+MAX_CONCURRENT = 40  # الحد الأقصى للطلبات المتزامنة
 
-async def fetch_jwt(session, uid, password):
+async def fetch_jwt(semaphore, session, uid, password):
     url = f"https://bngx-jwt-pgwb.onrender.com/api/oauth_guest?uid={uid}&password={password}"
-    try:
-        resp = await session.get(url, timeout=30)
-        if resp.status_code == 200:
-            data = resp.json()
-            token = data.get("token") or data.get("BearerAuth") or data.get("jwt")
-            return uid, token
-        return uid, None
-    except Exception:
-        return uid, None
+    async with semaphore:
+        try:
+            resp = await session.get(url, timeout=30)
+            if resp.status_code == 200:
+                data = resp.json()
+                token = data.get("token") or data.get("BearerAuth") or data.get("jwt")
+                return uid, token
+        except:
+            pass
+    return uid, None
 
 async def refresh_all_tokens():
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
     async with httpx.AsyncClient() as session:
-        tasks = [fetch_jwt(session, uid, pw) for uid, pw in ACCOUNTS.items()]
+        tasks = [fetch_jwt(semaphore, session, uid, pw) for uid, pw in ACCOUNTS.items()]
         results = await asyncio.gather(*tasks)
+
     with LOCK:
         for uid, token in results:
             if token:
@@ -75,20 +79,21 @@ async def refresh_all_tokens():
             elif uid in TOKENS:
                 del TOKENS[uid]
 
-async def add_friend(session, uid, token, target_uid):
+async def add_friend(semaphore, session, uid, token, target_uid):
     url = f"https://bngx-add-friend.onrender.com/add_friend?token={token}&uid={target_uid}"
-    try:
-        resp = await session.get(url, timeout=30)
-        if resp.status_code == 200:
-            text = resp.text
-            if "Invalid token" in text or resp.status_code == 401:
-                with LOCK:
-                    TOKENS.pop(uid, None)
-                return f"{uid} ➤ Invalid token (removed)"
-            return f"{uid} ➤ Success"
-        return f"{uid} ➤ Failed: {resp.text}"
-    except Exception as e:
-        return f"{uid} ➤ Error: {str(e)}"
+    async with semaphore:
+        try:
+            resp = await session.get(url, timeout=30)
+            if resp.status_code == 200:
+                text = resp.text
+                if "Invalid token" in text or resp.status_code == 401:
+                    with LOCK:
+                        TOKENS.pop(uid, None)
+                    return f"{uid} ➤ Invalid token (removed)"
+                return f"{uid} ➤ Success"
+            return f"{uid} ➤ Failed: {resp.text}"
+        except Exception as e:
+            return f"{uid} ➤ Error: {str(e)}"
 
 @app.route("/spam")
 def spam():
@@ -96,12 +101,13 @@ def spam():
     if not target_uid:
         return "يرجى إدخال ?id=UID", 400
 
-    # نجدد التوكنات أولاً بشكل متزامن
+    # نجدد التوكنات أولاً (بحد أقصى 40 متزامن)
     asyncio.run(refresh_all_tokens())
 
     async def run_spam():
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT)
         async with httpx.AsyncClient() as session:
-            tasks = [add_friend(session, uid, token, target_uid) for uid, token in TOKENS.items()]
+            tasks = [add_friend(semaphore, session, uid, token, target_uid) for uid, token in TOKENS.items()]
             return await asyncio.gather(*tasks)
 
     results = asyncio.run(run_spam())
@@ -113,4 +119,3 @@ def spam():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8398, debug=True)
-
